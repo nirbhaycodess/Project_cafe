@@ -9,9 +9,10 @@ import { menuService } from '../services/menuService';
 import { socketService } from '../services/socketService';
 import { Colors, Typography, Spacing, Shadows, Radius } from '../theme';
 import StudentNavigator from './StudentNavigator';
-import StaffNavigator from './StaffNavigator';
 import LoginScreen from '../screens/auth/LoginScreen';
-
+import SuperAdminDashboard from '../screens/admin/SuperAdminDashboard';
+import ManagerDashboard from '../screens/manager/ManagerDashboard';
+import StaffDashboard from '../screens/staff/StaffDashboard';
 export default function RootNavigator() {
   const { user, initializing, signOut } = useAuth();
   const [menuItems, setMenuItems] = useState([]);
@@ -51,9 +52,31 @@ export default function RootNavigator() {
     ]);
   };
 
-  const roleColor = user.role === 'Student' ? Colors.primary :
-                    user.role === 'Staff'   ? Colors.warning :
-                    user.role === 'Manager' ? Colors.accent : Colors.error;
+  const roleColor =
+    user.role === 'Student'
+      ? Colors.primary
+      : user.role === 'Staff'
+        ? Colors.warning
+        : user.role === 'Manager'
+          ? Colors.accent
+          : user.role === 'SuperAdmin'
+            ? Colors.success
+            : Colors.error;
+
+  const renderRoleNavigator = () => {
+    switch (user.role) {
+      case 'Student':
+        return <StudentNavigator menuItems={menuItems} setMenuItems={setMenuItems} />;
+      case 'SuperAdmin':
+        return <SuperAdminDashboard />;
+      case 'Manager':
+        return <ManagerDashboard />;
+      case 'Staff':
+        return <StaffDashboard />;
+      default:
+        return <LoginScreen />;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -74,13 +97,7 @@ export default function RootNavigator() {
       </View>
 
       {/* Role-based content */}
-      <View style={styles.content}>
-        {user.role === 'Student' ? (
-          <StudentNavigator menuItems={menuItems} setMenuItems={setMenuItems} />
-        ) : (
-          <StaffNavigator user={user} />
-        )}
-      </View>
+      <View style={styles.content}>{renderRoleNavigator()}</View>
     </SafeAreaView>
   );
 }

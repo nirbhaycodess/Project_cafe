@@ -2,36 +2,44 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-  collegeId: { 
-    type: String, 
-    unique: true, 
-    sparse: true, // Allows multiple users to not have a collegeId
-    trim: true 
+  name: {
+    type: String,
+    required: true,
+    trim: true
   },
-  email: { 
-    type: String, 
-    unique: true, 
-    sparse: true, // Allows students to not have an email
-    trim: true,
-    lowercase: true
+  collegeId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
   },
-  name: { 
-    type: String, 
-    required: true 
+  email: {
+    type: String,
+    unique: true,
+    sparse: true,
+    lowercase: true,
+    trim: true
   },
-  password: { 
-    type: String, 
-    required: true 
+  password: {
+    type: String,
+    required: true
   },
-  role: { 
-    type: String, 
-    enum: ['Student', 'Staff', 'Manager', 'SuperAdmin'], 
-    default: 'Student' 
+  role: {
+    type: String,
+    enum: ['Student', 'Staff', 'Manager', 'SuperAdmin'],
+    default: 'Student'
   },
-  isBlocked: { 
-    type: Boolean, 
-    default: false 
+  // Tracks approval state for Staff & Managers (Students default to Approved)
+  accountStatus: {
+    type: String,
+    enum: ['Pending', 'Approved', 'Rejected', 'Suspended'],
+    default: 'Approved'
+  },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
   }
 }, { timestamps: true });
 
-module.exports = mongoose.models.User || mongoose.model('User', userSchema);
+module.exports = mongoose.model('User', userSchema);

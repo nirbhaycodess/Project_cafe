@@ -5,59 +5,70 @@ const { verifyToken, verifyRole } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// POST: Add a new menu item (Manager & SuperAdmin only)
-router.post('/', verifyToken, verifyRole(['Manager', 'SuperAdmin']), async (req, res) => {
+// GET /api/menu - Public / All logged-in users
+router.get('/', async (req, res) => {
   try {
-    const { name, description, price, category, isAvailable, stock } = req.body;
-    const newItem = new MenuItem({ name, description, price, category, isAvailable, stock });
-    const savedItem = await newItem.save();
-    res.status(201).json({ message: 'Menu item created successfully.', item: savedItem });
-  } catch (error) {
-    console.error('Add Menu Item Error:', error);
-    res.status(500).json({ message: 'Failed to create menu item.' });
-  }
-});
-
-// GET: Retrieve all menu items (Accessible by any logged-in user)
-router.get('/', verifyToken, async (req, res) => {
-  try {
-    const items = await MenuItem.find();
+    const items = await MenuItem.find().sort({ createdAt: -1 });
     res.status(200).json(items);
   } catch (error) {
-    console.error('Fetch Menu Items Error:', error);
     res.status(500).json({ message: 'Failed to fetch menu items.' });
   }
 });
 
-// PUT: Update an existing menu item (Manager & SuperAdmin only)
+// POST /api/menu - Create menu item (Manager & SuperAdmin)
+router.post('/', verifyToken, verifyRole(['Manager', 'SuperAdmin']), async (req, res) => {
+  try {
+    const { name, description, price, category, imageUrl, isAvailable, stock, isQuickItem } = req.body;
+
+    if (!name || price === undefined || !category) {
+      return res.status(400).json({ message: 'Name, price, and category are required.' });
+    }
+
+    const newItem = new MenuItem({
+      name: name.trim(),
+      description: description ? description.trim() : '',
+      price: Number(price),
+      category: category.trim(),
+      imageUrl: imageUrl || '',
+      isAvailable: isAvailable !== undefined ? isAvailable : true,
+      stock: stock !== undefined ? Number(stock) : -1,
+      isQuickItem: Boolean(isQuickItem),
+    });
+
+    const savedItem = await newItem.save();
+    res.status(201).json({ message: 'Menu item created.', item: savedItem });
+  } catch (error) {
+    console.error('Create Menu Error:', error);
+    res.status(500).json({ message: 'Failed to create menu item.' });
+  }
+});
+
+// PUT /api/menu/:id - Update menu item (Manager & SuperAdmin)
 router.put('/:id', verifyToken, verifyRole(['Manager', 'SuperAdmin']), async (req, res) => {
   try {
-    // findByIdAndUpdate takes the ID, the new data, and { new: true } to return the updated document
-    const updatedItem = await MenuItem.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    
+    const updatedItem = await MenuItem.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
     if (!updatedItem) {
       return res.status(404).json({ message: 'Menu item not found.' });
     }
-    
-    res.status(200).json({ message: 'Menu item updated successfully.', item: updatedItem });
+    res.status(200).json({ message: 'Menu item updated.', item: updatedItem });
   } catch (error) {
-    console.error('Update Menu Item Error:', error);
     res.status(500).json({ message: 'Failed to update menu item.' });
   }
 });
 
-// DELETE: Remove a menu item (Manager & SuperAdmin only)
+// DELETE /api/menu/:id - Delete menu item (Manager & SuperAdmin)
 router.delete('/:id', verifyToken, verifyRole(['Manager', 'SuperAdmin']), async (req, res) => {
   try {
-    const deletedItem = await MenuItem.findByIdAndDelete(req.params.id);
-    
-    if (!deletedItem) {
+    const deleted = await MenuItem.findByIdAndDelete(req.params.id);
+    if (!deleted) {
       return res.status(404).json({ message: 'Menu item not found.' });
     }
-    
-    res.status(200).json({ message: 'Menu item deleted successfully.' });
+    res.status(200).json({ message: 'Menu item deleted.' });
   } catch (error) {
-    console.error('Delete Menu Item Error:', error);
     res.status(500).json({ message: 'Failed to delete menu item.' });
   }
 });

@@ -130,12 +130,21 @@ export default function LoginScreen() {
 
       // Determine the identifier that was just registered
       const newIdentifier = regRole === 'Student' ? regCollegeId.trim() : regEmail.trim().toLowerCase();
+      const isPending = regRole !== 'Student';
 
-      Alert.alert(
-        'Account Created! 🎉',
-        `Welcome, ${regName.trim()}!\nYour ${regRole} account is ready. Sign in to continue.`,
-        [{ text: 'Sign In Now', onPress: () => {} }]
-      );
+      if (isPending) {
+        Alert.alert(
+          'Approval Pending ⏳',
+          `Welcome, ${regName.trim()}!\nYour ${regRole} registration has been sent to the SuperAdmin for approval. You will be able to sign in once approved.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Account Created! 🎉',
+          `Welcome, ${regName.trim()}!\nYour Student account is ready. Sign in to continue.`,
+          [{ text: 'SIGN IN NOW' }]
+        );
+      }
 
       // Reset register form
       setRegName('');
