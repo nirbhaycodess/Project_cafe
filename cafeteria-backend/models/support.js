@@ -7,6 +7,16 @@ const supportSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  order: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Order',
+    default: null,
+  },
+  category: {
+    type: String,
+    enum: ['Refund', 'Complaint', 'Feedback', 'Help'],
+    default: 'Help',
+  },
   subject: {
     type: String,
     required: true,
@@ -19,7 +29,7 @@ const supportSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Open', 'Resolved'],
+    enum: ['Open', 'Resolved', 'Refunded'],
     default: 'Open',
   },
   managerReply: {

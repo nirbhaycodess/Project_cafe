@@ -292,39 +292,53 @@ router.post('/:id/feedback', verifyToken, async (req, res) => {
   }
 });
 
-// 11. POST /api/orders/support - Student sends Help & Support message to Manager
+// 11. POST /api/orders/support - Student sends Complaint, Refund Request, or Help ticket to Manager
 router.post('/support', verifyToken, async (req, res) => {
   try {
-    const { subject, message } = req.body;
+    const { category, orderId, subject, message } = req.body;
     if (!subject || !message) {
       return res.status(400).json({ message: 'Subject and message are required.' });
     }
+
     const ticket = await Support.create({
       user: req.user.userId,
+      order: orderId || null,
+      category: category || 'Help',
       subject: subject.trim(),
       message: message.trim(),
     });
-    res.status(201).json({ message: 'Support request sent to the Manager!', ticket });
+
+    const populatedTicket = await Support.findById(ticket._id)
+      .populate('user', 'name collegeId email')
+      .populate('order', 'orderToken totalAmount paymentMethod paymentStatus orderStatus');
+
+    req.io.emit('newSupportTicket', populatedTicket);
+
+    res.status(201).json({ message: 'Request sent to the Manager!', ticket: populatedTicket });
   } catch (error) {
+    console.error('Support create error:', error);
     res.status(500).json({ message: 'Failed to submit support ticket.' });
   }
 });
 
-// 12. GET /api/orders/my-support - Student views their own Help & Support tickets
+// 12. GET /api/orders/my-support - Student views their own Help, Refund & Complaint tickets
 router.get('/my-support', verifyToken, async (req, res) => {
   try {
-    const tickets = await Support.find({ user: req.user.userId }).sort({ createdAt: -1 });
+    const tickets = await Support.find({ user: req.user.userId })
+      .populate('order', 'orderToken totalAmount paymentMethod paymentStatus')
+      .sort({ createdAt: -1 });
     res.status(200).json(tickets);
   } catch (error) {
     res.status(500).json({ message: 'Failed to load support history.' });
   }
 });
 
-// 13. GET /api/orders/all-support - Manager/SuperAdmin views all student support tickets
+// 13. GET /api/orders/all-support - Manager/SuperAdmin views all student complaints, refund requests & tickets
 router.get('/all-support', verifyToken, verifyRole(['Manager', 'SuperAdmin']), async (req, res) => {
   try {
     const tickets = await Support.find()
       .populate('user', 'name collegeId email')
+      .populate('order', 'orderToken totalAmount paymentMethod paymentStatus orderStatus')
       .sort({ createdAt: -1 });
     res.status(200).json(tickets);
   } catch (error) {
@@ -332,4 +346,54 @@ router.get('/all-support', verifyToken, verifyRole(['Manager', 'SuperAdmin']), a
   }
 });
 
+// 14. PUT /api/orders/support/:id/resolve - Manager replies to ticket, resolves it, or approves a refund
+router.put('/support/:id/resolve', verifyToken, verifyRole(['Manager', 'SuperAdmin']), async (req, res) => {
+  try {
+    const { status, managerReply, markOrderRefunded } = req.body;
+    const ticket = await Support.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Support ticket not found.' });
+    }
+
+    if (status) ticket.status = status;
+    if (managerReply !== undefined) ticket.managerReply = managerReply.trim();
+
+    // If Manager approves a refund and an order is attached, update that order's paymentStatus to 'Refunded'
+    if (markOrderRefunded && ticket.order) {
+      await Order.findByIdAndUpdate(ticket.order, { paymentStatus: 'Refunded' });
+      ticket.status = 'Refunded';
+    }
+
+    await ticket.save();
+
+    const updatedTicket = await Support.findById(ticket._id)
+      .populate('user', 'name collegeId email')
+      .populate('order', 'orderToken totalAmount paymentMethod paymentStatus orderStatus');
+
+    req.io.emit('supportTicketUpdated', updatedTicket);
+
+    res.status(200).json({
+      message: markOrderRefunded
+        ? 'Refund approved and response sent to student!'
+        : 'Ticket updated and response sent!',
+      ticket: updatedTicket,
+    });
+  } catch (error) {
+    console.error('Resolve support error:', error);
+    res.status(500).json({ message: 'Failed to update support ticket.' });
+  }
+});
+
+// 15. GET /api/orders/feedback-list - Manager views all student ratings & order feedback
+router.get('/feedback-list', verifyToken, verifyRole(['Manager', 'SuperAdmin']), async (req, res) => {
+  try {
+    const feedbackOrders = await Order.find({ 'feedback.rating': { $exists: true } })
+      .populate('user', 'name collegeId')
+      .populate('items.menuItem', 'name')
+      .sort({ 'feedback.createdAt': -1, updatedAt: -1 });
+    res.status(200).json(feedbackOrders);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to load student feedback.' });
+  }
+});
 module.exports = router;
